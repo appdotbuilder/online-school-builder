@@ -1,16 +1,42 @@
+import { db } from '../db';
+import { lessonsTable } from '../db/schema';
 import { type UpdateLessonInput, type Lesson } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function updateLesson(input: UpdateLessonInput): Promise<Lesson> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is updating an existing lesson with the provided fields,
-    // ensuring proper permission checks and maintaining lesson ordering.
-    return Promise.resolve({
-        id: input.id,
-        course_id: 0, // Should fetch from database
-        title: input.title || 'Placeholder Title',
-        description: input.description || null,
-        order_index: input.order_index || 0,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Lesson);
-}
+export const updateLesson = async (input: UpdateLessonInput): Promise<Lesson> => {
+  try {
+    // Build update object with only provided fields
+    const updateData: Partial<typeof lessonsTable.$inferInsert> = {};
+    
+    if (input.title !== undefined) {
+      updateData.title = input.title;
+    }
+    
+    if (input.description !== undefined) {
+      updateData.description = input.description;
+    }
+    
+    if (input.order_index !== undefined) {
+      updateData.order_index = input.order_index;
+    }
+
+    // Always update the updated_at timestamp
+    updateData.updated_at = new Date();
+
+    // Update the lesson and return the updated record
+    const result = await db.update(lessonsTable)
+      .set(updateData)
+      .where(eq(lessonsTable.id, input.id))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error(`Lesson with id ${input.id} not found`);
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Lesson update failed:', error);
+    throw error;
+  }
+};

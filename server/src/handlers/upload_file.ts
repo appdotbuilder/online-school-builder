@@ -1,4 +1,7 @@
+import { db } from '../db';
+import { filesTable, usersTable } from '../db/schema';
 import { type File } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function uploadFile(
     filename: string,
@@ -8,24 +11,58 @@ export async function uploadFile(
     mimeType: string,
     uploadedBy: number
 ): Promise<File> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is storing file metadata after successful upload,
-    // validating file types, sizes, and implementing storage quotas.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
-        filename: filename,
+  try {
+    // Verify that the user exists before creating the file record
+    const userExists = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.id, uploadedBy))
+      .execute();
+
+    if (userExists.length === 0) {
+      throw new Error(`User with ID ${uploadedBy} not found`);
+    }
+
+    // Insert file record
+    const result = await db.insert(filesTable)
+      .values({
+        filename,
         original_filename: originalFilename,
         file_path: filePath,
         file_size: fileSize,
         mime_type: mimeType,
-        uploaded_by: uploadedBy,
-        created_at: new Date()
-    } as File);
+        uploaded_by: uploadedBy
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('File upload failed:', error);
+    throw error;
+  }
 }
 
 export async function getFilesByUser(userId: number): Promise<File[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all files uploaded by a specific user,
-    // useful for file management and storage quota tracking.
-    return [];
+  try {
+    // Verify that the user exists
+    const userExists = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .execute();
+
+    if (userExists.length === 0) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+
+    // Get all files uploaded by the user
+    const files = await db.select()
+      .from(filesTable)
+      .where(eq(filesTable.uploaded_by, userId))
+      .execute();
+
+    return files;
+  } catch (error) {
+    console.error('Get files by user failed:', error);
+    throw error;
+  }
 }
